@@ -1,0 +1,347 @@
+---
+title: " MOHAMED'S MINI PROJECT 1"
+format: pdf
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+infinity_war <- read_csv("infinity_war.csv")
+```
+
+# INTRODUCTION
+
+The Marvel Cinematic Universe (MCU) is a series of interconnected superhero movies and television shows based on characters from Marvel Comics. Rather than each movie existing completely on its own, characters and storylines often cross over between different films, eventually bringing many of the heroes together in the Avengers movies.
+
+Avengers: Infinity War, released in 2018, is one of the biggest of these crossovers, bringing together characters such as Iron Man, Thor, Spider-Man, Doctor Strange, the Guardians of the Galaxy, and many others. They face Thanos, a powerful villain attempting to collect the six Infinity Stones so he can wipe out half of all life in the universe. Unlike many superhero movies where the villain stays mostly in the background, Thanos is a major presence throughout Infinity War, which makes his dialogue particularly interesting to analyze.
+
+The dataset used in this project contains 990 lines of dialogue from 52 characters in Avengers: Infinity War. Each observation includes the character speaking and the line they said, which makes it possible to compare how different characters use language throughout the movie. One character that stands out is Thanos, who has 75 lines of dialogue and is the fourth most frequent speaker in the dataset. Since he plays such a central role in the movie, I first wanted to explore what Thanos talks about and how his dialogue differs from everyone else’s.
+
+```{r}
+infinity_war |>
+  count(character, sort = TRUE)
+```
+
+# WHAT DOES THANOS TALK ABOUT?
+
+Based on these counts, I first focus on Thanos. I expect his dialogue to be darker and more focused on his goal of “fixing” the universe. To begin, I look at which words he uses most frequently. 
+To do this, I use unnest_tokens() to separate each line of dialogue into individual words. I also use anti_join() with stop_words to remove common words such as “I,” “the,” and “and” that do not tell us much about the content of his dialogue. Finally, count() counts how often each remaining word appears.
+
+```{r}
+thanos_word_counts <- infinity_war |>
+  filter(character == "THANOS") |>
+  unnest_tokens(word, line) |>
+  anti_join(stop_words, by = "word") |>
+  count(word, sort = TRUE) |>
+  slice_head( n = 15 )
+```
+
+**Categorizing Thanos's most common words**
+
+Looking at Thanos’s 15 most common words, several appear to relate to similar topics. I grouped these words into four themes to make these patterns easier to see in the visualization. For that, I use fct_recode() to change individual words into broader categories such as Family & Relationships and Mission & Beliefs.
+
+```{r}
+thanos_word_counts <- thanos_word_counts |>
+  mutate(theme = as.factor(word)) |>
+  mutate(
+    theme = fct_recode(
+      theme,
+      "Infinity Stones & Universe" = "stone",
+      "Infinity Stones & Universe" = "soul",
+      "Infinity Stones & Universe" = "reality",
+      "Infinity Stones & Universe" = "galaxy",
+      "Family & Relationships" = "daughter",
+      "Family & Relationships" = "children",
+      "Family & Relationships" = "gamora",
+      "Mission & Beliefs" = "destiny",
+      "Mission & Beliefs" = "cease",
+      "Mission & Beliefs" = "finite",
+      "Mission & Beliefs" = "exist",
+      "Other" = "time",
+      "Other" = "day",
+      "Other" = "head",
+      "Other" = "brought"
+    )
+  )
+```
+
+I then visualize the 15 most common words. fct_reorder() orders the words according to their frequency, while fill = theme colors words belonging to the same theme together.
+
+```{r}
+thanos_word_counts |>
+  slice_head(n = 15) |>
+  ggplot(aes(
+    x = fct_reorder(word, n),
+    y = n,
+    fill = theme
+  )) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Most Common Words Used by Thanos",
+    subtitle = "Avengers: Infinity War",
+    x = NULL,
+    y = "Number of Uses",
+    fill = "Theme"
+  ) +
+  theme_minimal()
+```
+
+The most common words in Thanos’s dialogue reveal several themes connected to his role in the movie. Words such as “stone,” “soul,” “reality,” and “galaxy” reflect his focus on the Infinity Stones and the universe, while “daughter,” “Gamora,” and “children” show the importance of family and relationships in his dialogue. Words such as “destiny,” “finite,” and “cease” also reflect the beliefs behind his mission. Overall, his most common words suggest that his dialogue focuses on both his goal for the universe and the personal beliefs and relationships that motivate him.
+
+# COMPARING THANOS TO THE OTHER CHARACTERS
+
+Although word frequency shows what Thanos talks about most, it does not necessarily show what makes his dialogue different. Some of his most common words, such as “stone,” may also be commonly used by other characters. To find words that are more distinctive to Thanos, I use TF-IDF. TF-IDF gives more importance to words that appear frequently in one group but are less common in the other group. **For this comparison, I separate the dialogue into two groups: Thanos and everyone else.**
+
+I use if_else() to separate the dialogue into Thanos and everyone else. I then tokenize the dialogue, remove stop words, and count how frequently each word appears in each group.
+
+```{r}
+thanos_comparison <- infinity_war |>
+  mutate(
+    group = if_else(
+      character == "THANOS",
+      "Thanos",
+      "Everyone Else"
+    )
+  ) |>
+  unnest_tokens(word, line) |>
+  anti_join(stop_words, by = "word") |>
+  count(group, word, sort = TRUE)
+```
+
+Next, I use bind_tf_idf() to calculate a TF-IDF score for each word. A higher TF-IDF value indicates that a word is more distinctive to one group compared with the other.
+
+```{r}
+thanos_tfidf <- thanos_comparison |>
+  bind_tf_idf(
+    term = word,
+    document = group,
+    n = n
+  )
+```
+
+I focus on distinctive words that Thanos uses at least twice. This removes words that appear only once and makes it easier to focus on repeated patterns in his dialogue.
+
+```{r}
+thanos_tfidf |>
+  filter(
+    group == "Thanos",
+    n >= 2,
+    tf_idf > 0
+  ) |>
+  select(word, n, tf_idf) |>
+  arrange(desc(tf_idf))
+```
+
+Interestingly, the words that distinguish Thanos from the other characters are different from some of his most frequently used words. Words such as “stone” and “time” appeared frequently in his dialogue, but they were also used by other characters and therefore did not have a high TF-IDF score. Instead, words such as “destiny,” “finite,” “exist,” “cease,” and “galaxy” were more distinctive to Thanos. These words reinforce the pattern from the first analysis, showing that Thanos’s dialogue is especially connected to his beliefs about the universe and his mission to change it. The seven words in the table have the same TF-IDF score because each appears twice in Thanos’s dialogue while not appearing in the dialogue of everyone else.
+
+## DO THE HEROES ACTUALLY TALK LIKE A TEAM? 
+
+Infinity War brings together heroes from different groups who eventually have to work toward the same goal. However, being on the same side does not necessarily mean that they speak like a team. One way to explore this is through the pronouns they use. Words such as “I,” “me,” and “my” emphasize the individual, while words such as “we,” “us,” and “our” emphasize the group. I want to compare these two types of language to see whether the heroes speak more individually or collectively.
+I expect the heroes to generally use more collective language because they are working together to defeat Thanos. However, I also expect individual language to appear frequently in situations where characters discuss their own responsibilities, decisions, or sacrifices.
+
+I focus on the nine heroes with the most dialogue in the dataset. This gives enough dialogue from each character to make their language patterns more meaningful while excluding characters who only speak a few times.
+
+```{r}
+heroes <- infinity_war |>
+  filter(character %in% c(
+    "TONY STARK",
+    "PETER QUILL",
+    "THOR",
+    "STEPHEN STRANGE",
+    "BRUCE BANNER",
+    "ROCKET",
+    "GAMORA",
+    "PETER PARKER",
+    "WANDA MAXIMOFF"
+  ))
+```
+
+Before searching for pronouns, I use str_to_lower() to convert all dialogue to lowercase. This ensures that words such as “We” and “we” are treated the same.
+
+```{r, echo=TRUE}
+heroes <- heroes |>
+  mutate(line_lower = str_to_lower(line))
+```
+
+Then, I use str_count() with regular expressions to count individual and collective pronouns in each line. The first pattern searches for “i,” “me,” “my,” or “mine,” while the second searches for “we,” “us,” “our,” or “ours.” The \\b identifies word boundaries so that the pattern matches complete words rather than parts of other words.
+
+```{r, echo = TRUE}
+heroes <- heroes |>
+  mutate(
+    individual = str_count(
+      line_lower,
+      "\\b(i|me|my|mine)\\b"
+    ),
+    collective = str_count(
+      line_lower,
+      "\\b(we|us|our|ours)\\b"
+    )
+  )
+```
+
+```{r}
+hero_pronouns <- heroes |>
+  group_by(character) |>
+  summarise(
+    individual = sum(individual),
+    collective = sum(collective)
+  )
+```
+
+Contrary to my initial hypothesis, every hero uses more individual pronouns than collective pronouns. Because the heroes have different amounts of dialogue, comparing raw pronoun counts could be misleading. To make the comparison fairer, I calculate the proportion of each character's pronouns that are individual or collective.
+
+```{r}
+hero_pronouns <- hero_pronouns |>
+  mutate(
+    total = individual + collective,
+    prop_individual = individual / total,
+    prop_collective = collective / total
+  )
+```
+
+I reshape the data so that the individual and collective proportions can be compared in the same visualization.
+
+```{r}
+hero_pronouns_long <- hero_pronouns |>
+  select(character, prop_individual, prop_collective) |>
+  pivot_longer(
+    cols = c(prop_individual, prop_collective),
+    names_to = "language",
+    values_to = "proportion"
+  ) |>
+  mutate(
+    language = fct_recode(
+      as.factor(language),
+      "Individual" = "prop_individual",
+      "Collective" = "prop_collective"
+    )
+  )
+```
+
+```{r}
+hero_order <- hero_pronouns |>
+  arrange(desc(prop_individual)) |>
+  pull(character)
+hero_pronouns_long |>
+  mutate(
+    character = factor(character, levels = rev(hero_order))
+  ) |>
+  ggplot(aes(
+    x = character,
+    y = proportion,
+    fill = language
+  )) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Do the Heroes Talk Like a Team?",
+    subtitle = "Individual vs. collective pronoun use in Infinity War",
+    x = NULL,
+    y = "Proportion of Pronouns",
+    fill = "Language"
+  ) +
+  theme_minimal()
+```
+
+The results do not support my initial hypothesis that the heroes would generally use more collective language. Every character uses individual pronouns more often than collective pronouns, although the size of the difference varies considerably. Thor and Peter Parker stand out, with almost 90% of their pronoun use being individual. In contrast, Wanda Maximoff and Stephen Strange use the most collective language, with more than 40% of their pronouns referring to a group. Tony Stark also uses collective language relatively often compared with several of the other heroes.
+
+However, using individual pronouns does not necessarily mean that a character is acting selfishly or not working as part of the team. A character might use “I” when discussing a personal responsibility or sacrifice that is meant to help everyone else. This raises another question: **could some of this individual language actually be connected to sacrifice?**
+
+## IS INDIVIDUAL LANGUAGE CONNECTED TO SACRIFICE?
+
+Since individual language was more common than I expected, I wanted to investigate whether some of it could be related to sacrifice. Throughout Infinity War, the heroes face difficult decisions, sometimes putting themselves or others at risk to defeat Thanos. I want to examine whether dialogue about sacrifice and responsibility also contains individual language.
+
+I use str_detect() to identify lines containing words related to sacrifice, death, saving others, or personal responsibility. The regular expression searches for several related words, while \\b ensures that complete words are matched.
+
+```{r, echo=TRUE}
+sacrifice_lines <- heroes |>
+  filter(
+    str_detect(
+      line_lower,
+      "\\b(sacrifice|die|death|save|saving|protect|responsibility|risk)\\b"
+    )
+  ) |>
+  select(character, line, individual, collective) 
+```
+The search identified 13 lines containing words related to sacrifice, death, saving, or protection. However, not all of these lines actually describe self-sacrifice. For example, Thor uses the word “die” when threatening an enemy, while Peter Parker uses “save” when referring to rescuing Doctor Strange. Other lines reveal a more interesting relationship between individual and collective language. Tony Stark says he is trying to “protect us,” combining personal responsibility with concern for the group. Stephen Strange also refers to “our oath” when discussing the protection of the Time Stone. These examples suggest that individual and collective language are not necessarily opposites. A hero can speak individually while still acting for the benefit of others.
+
+However, this analysis only looks at lines containing certain keywords, so it might miss other moments of sacrifice. While some examples support my hypothesis, there isn't enough evidence to conclude that individual language is generally connected to sacrifice.
+
+## DOES INFINITY WAR GET DARKER AS THE MOVIE PROGRESSES?
+
+So far, I have explored what Thanos talks about and how the heroes use language. However, I also wanted to look at the movie as a whole. Infinity War starts with the heroes trying to stop Thanos, but as the story progresses, they face increasingly difficult situations and eventually suffer major losses. This made me wonder whether the language in the movie becomes more negative as it progresses. I expect the dialogue to become darker toward the end, especially as Thanos gets closer to achieving his goal.
+
+To examine this, I divide the dialogue into ten sections based on its order in the dataset. I use row_number() to preserve the order of the dialogue and ntile() to divide the lines into ten approximately equal groups. This assumes that the dataset follows the order of the movie.
+
+```{r}
+movie_sections <- infinity_war |>
+  mutate(
+    dialogue_order = row_number(),
+    section = ntile(dialogue_order, 10)
+  )
+movie_sections
+```
+
+I use the Bing sentiment lexicon to classify words in the dialogue as positive or negative. First, I separate the dialogue into individual words using unnest_tokens(). Then, I use inner_join() to match those words with the Bing lexicon. Words that do not appear in the lexicon are excluded from the sentiment analysis.
+```{r}
+movie_sentiment <- movie_sections |>
+  unnest_tokens(word, line) |>
+  inner_join(
+    get_sentiments("bing"),
+    by = "word"
+  )
+```
+
+```{r}
+sentiment_counts <- movie_sentiment |>
+  count(section, sentiment) |>
+  pivot_wider(
+    names_from = sentiment,
+    values_from = n,
+    values_fill = 0
+  ) |>
+  mutate(
+    net_sentiment = positive - negative
+  )
+```
+
+After calculating the sentiment scores, I found that the dialogue does not become consistently more negative as the movie progresses. Instead, the scores fluctuate, with some sections being more positive than others. To better understand this pattern, I will visualize the net sentiment across the ten sections of the movie.
+
+```{r}
+#| fig-alt: "Line graph showing net sentiment across ten sections of Avengers: Infinity War. The horizontal axis represents movie sections from 1 to 10, and the vertical axis shows positive word counts minus negative word counts. A blue line connects the sentiment scores, with a dashed horizontal line marking zero. Sentiment fluctuates, reaching its highest value of positive 20 in section 5 and falling to negative 8 in sections 7 and 10."
+sentiment_counts |>
+  ggplot(aes(
+    x = section,
+    y = net_sentiment
+  )) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_line(linewidth = 1, color = "blue") +
+  geom_point(size = 3, color = "blue") +
+  scale_x_continuous(breaks = 1:10) +
+  labs(
+    title = "Does Infinity War Get Darker?",
+    subtitle = "Net sentiment across ten sections of dialogue",
+    x = "Movie Section",
+    y = "Net Sentiment (Positive - Negative)"
+  ) +
+  theme_minimal()
+```
+
+The results partially support my hypothesis. Although the movie ends with more negative than positive words, the dialogue does not become consistently darker throughout the story. Section 5 has the highest net sentiment at +20, suggesting a particularly positive stretch of dialogue. 
+The unusually positive sentiment in section 5 may be explained by the reunion of several Avengers, with characters expressing happiness about seeing each other again. There is also a sense of hope and teamwork as the heroes come together to protect Vision and find a way to stop Thanos, even though they are facing a serious threat.
+However, sentiment drops sharply afterward, reaching −8 in sections 7 and 10. This suggests that the language in Infinity War moves between positive and negative moments rather than following a steady downward trend. Interestingly, the final section is among the most negative, which fits the movie's tragic ending.
+
+> However, the Bing lexicon classifies individual words without considering their full context. For example, sarcasm, threats, or emotionally important scenes might not be accurately represented by the sentiment scores. Also, the ten sections represent equal amounts of dialogue rather than equal amounts of movie time.
+
+## CONCLUSION
+
+Through this analysis, I explored how dialogue in Avengers: Infinity War reflects the characters and the overall story. Thanos's most common and distinctive words revealed his focus on the Infinity Stones, his family (mostly his daughter Gamora), and his beliefs about the universe. When comparing the heroes, I found that every character used more individual pronouns than collective ones, which went against my initial hypothesis. However, looking more closely at their dialogue showed that speaking individually does not necessarily mean they are not working toward a common goal.
+
+I also expected the movie's dialogue to become increasingly negative as the story progressed. Instead, sentiment fluctuated throughout the movie, although the final section was among the most negative.This fits the movie's tragic ending, where Thanos succeeds and several heroes disappear. Overall, this project showed me how text analysis can reveal patterns that might not be obvious when watching a movie. At the same time, the results reminded me that word counts and sentiment scores cannot fully capture the meaning of dialogue without considering its context.
