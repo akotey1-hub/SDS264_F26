@@ -1,3 +1,4 @@
+
 ---
 title: "From Penguins to APIs"
 subtitle: "An easy introduction to the plumber package"
@@ -13,33 +14,47 @@ execute:
   warning: false
   message: false
 ---
-{r}
+
+```{r}
 #| include: false
 library(dplyr)
 library(ggplot2)
 library(palmerpenguins)
-"
-What if someone could use your R function without RStudio?
+```
 
-That's what plumber helps us do!
+## What if someone could use your R function without RStudio?
 
+**That's what `plumber` helps us do!**
+
+![](https://allisonhorst.github.io/palmerpenguins/reference/figures/lter_penguins.png){width="55%" fig-alt="Illustrations of penguin species"}
+
+::: {.notes}
 (0:00–0:35) We have been learning to write functions in R. Today I'll show how plumber lets other people use our functions through a web address.
+:::
 
-What is plumber?
+---
 
-plumber is an R package that turns an R function into an API.
+## What is `plumber`?
 
-An API lets one program ask another program for information.
+`plumber` is an R package that turns an **R function** into an **API**.
 
-Ask through a URL → R calculates → Get an answer
+**An API lets one program ask another program for information.**
 
+::: {.fragment}
+**Ask through a URL → R calculates → Get an answer**
+:::
+
+::: {.notes}
 (0:35–1:15) Think of an API as a way to ask a question. We send a request, R runs a function, and we get an answer back.
+:::
 
-Let's use real penguin data
+---
 
-The palmerpenguins dataset contains measurements of Adelie, Chinstrap, and Gentoo penguins.
+## Let's use real penguin data
 
-{r}
+The `palmerpenguins` dataset contains measurements of **Adelie, Chinstrap, and Gentoo** penguins.
+
+```{r}
 #| echo: false
 #| fig-width: 8
 #| fig-height: 4
@@ -50,12 +65,17 @@ penguins |>
   geom_col(show.legend = FALSE) +
   labs(x = "Species", y = "Average body mass (g)") +
   theme_minimal(base_size = 18)
+```
 
+::: {.notes}
 (1:15–2:00) This is real penguin data. The chart compares average body mass. Now imagine asking for the statistics of one species through a URL.
+:::
 
-Turning an R Function into an API
+---
 
-{r}
+## Turning an R Function into an API
+
+```{r}
 #| eval: false
 #| echo: true
 #* @get /penguins
@@ -68,36 +88,52 @@ function(species = "Adelie") {
       avg_flipper = round(mean(flipper_length_mm, na.rm = TRUE), 1)
     )
 }
+```
 
-The key: #* @get /penguins makes this function accessible through a URL.
+::: {.fragment}
+**The key:** `#* @get /penguins` makes this function accessible through a URL.
+:::
 
-After adding the Plumber annotation, use pr() and pr_run() to start the API server and generate an interactive Swagger interface.
+::: {.fragment}
+After adding the Plumber annotation, use `pr()` and `pr_run()` to start the API server and generate an interactive Swagger interface.
+:::
 
+::: {.notes}
 (2:00–2:35) The new thing is the annotation. It tells plumber to create a web endpoint named penguins.
+:::
 
-Live Demo: Let's Try Our API!
+---
 
-Click below to open our Penguin API:
+## Live Demo: Let's Try Our API!
 
-🐧 Open Swagger — Penguin API
+**Click below to open our Penguin API:**
 
-Let's see what happens when we change the penguin species!
+### [🐧 Open Swagger — Penguin API](http://127.0.0.1:8000/__docs__/)
+
+::: {.fragment}
+**Let's see what happens when we change the penguin species!**
 
 The URL tells our function which penguin species we want.
+:::
 
+::: {.notes}
 (2:35–4:05) Open Swagger, try Adelie, and then change the species to Gentoo. Show how the returned statistics change.
+:::
 
-Why is this useful?
+---
 
-Share results with people who don't use R.
+## Why is this useful?
 
-Let a website request statistics from R.
+- Share results with people who don't use R.
+- Let a website request statistics from R.
+- Make predictions from an R model available to other apps.
 
-Make predictions from an R model available to other apps.
+**Takeaway: `plumber` lets us share what our R functions can do.**
 
-Takeaway: plumber lets us share what our R functions can do.
+<small>Sources: [plumber](https://www.rplumber.io/) · [Palmer Penguins](https://allisonhorst.github.io/palmerpenguins/)</small>
 
-<small>Sources: plumber · Palmer Penguins</small>
-
+::: {.notes}
 (4:05–4:40) Plumber is useful because you can write your analysis once and let other programs request the results. Thank you!
+:::
+
 
